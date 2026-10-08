@@ -1,0 +1,76 @@
+{
+  "name": "dsh-redis-queue-custom-plugin",
+  "description": "DeepSeek Harness (dsh) Redis queue consumer plugin: environment-gated polling of the DSH:TASK queue with idempotency, distributed-lock workspace provisioning, Skills-Manager resolution, and session launch.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "redis",
+    "queue",
+    "consumer"
+  ],
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yixiuzhemu/dsh-redis-queue-custom-plugin.git"
+  },
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib",
+    "src",
+    "cordis.patch.yml"
+  ],
+  "scripts": {
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "clean": "node scripts/clean.mjs",
+    "prepack": "npm run build && node scripts/preflight.mjs",
+    "prepare": "npm run build"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-agent": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-brand": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-llm": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-session": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-skill": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-workspace": "^0.1.5-rc.2",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "dsh-redis-plugin": "*"
+  },
+  "peerDependenciesMeta": {
+    "dsh-redis-plugin": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

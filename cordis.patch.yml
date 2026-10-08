@@ -1,0 +1,25 @@
+# dsh bundle patch: insert the plugin into the web profile layer stack,
+# after dsh-redis-plugin (ctx.redis) and the host agents/llm/skills/sessions/
+# workspaceRegistry services it consumes.
+- insert:
+    - id: redis-queue-consumer
+      name: 'dsh-redis-queue-custom-plugin'
+      config:
+        enabled: true
+        queueKey: 'DSH:TASK'
+        deadLetterKey: 'DSH:TASK:DLQ'
+        processingKey: 'DSH:TASK:processing'
+        # 每 15s 扫描一次环境；达标才消费一个任务。
+        pollIntervalMs: 15000
+        consumeMode: 'poll'          # poll(非阻塞 lPop) | blocking(brPop 短超时)
+        fifo: true                   # 生产者 rPush + 消费者 lPop = FIFO
+        batchSize: 1
+        defaultProvider: 'deepseek'
+        defaultModel: 'deepseek-chat'
+        requeueOnFailure: true
+        maxRetries: 3
+        thresholds:
+          maxCpuUsageRatio: 0.85
+          maxMemoryUsageRatio: 0.90
+          maxConcurrentSessions: 3
+          cpuSampleWindowMs: 1000
