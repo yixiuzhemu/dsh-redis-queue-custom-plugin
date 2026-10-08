@@ -3,7 +3,7 @@
 # workspaceRegistry services it consumes.
 - insert:
     - id: redis-queue-consumer
-      name: 'dsh-redis-queue-custom-plugin'
+      name: '@dtranx/dsh-redis-queue-custom-plugin'
       config:
         enabled: true
         queueKey: 'DSH:TASK'
