@@ -18,6 +18,7 @@ import type { LaunchInput } from './types.ts'
 import { agentOptionsOf, resolveModelSelection } from './model.ts'
 import { injectSkills } from './skills.ts'
 import { buildPrompt } from './prompt.ts'
+import { debugLog } from './debug.ts'
 
 export class SessionLauncher {
   constructor(
@@ -38,10 +39,13 @@ export class SessionLauncher {
     const sessionId = brandString<SessionId>(randomUUID())
     const resolved = await resolveModelSelection(
       this.ctx,
-      undefined,
+      task.provider !== undefined || task.model !== undefined
+        ? { ...(task.provider !== undefined ? { provider: task.provider } : {}), ...(task.model !== undefined ? { model: task.model } : {}) }
+        : undefined,
       this.cfg.defaultProvider,
       this.cfg.defaultModel,
     )
+    debugLog(`[redis-queue] resolved model: ${resolved.provider}/${resolved.model}`)
     const prompt = buildPrompt(task, this.cfg.promptTemplate)
 
     const handle: AgentHandle = await this.ctx.agents.create({

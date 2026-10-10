@@ -14,17 +14,46 @@ import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { QueueConfig } from './config.ts'
 import type { EnvironmentMonitor } from './monitor.ts'
 import type { TaskConsumer } from './consumer.ts'
+import type { QueueStore } from './queue.ts'
+import { debugLog } from './debug.ts'
+
+/**
+ * Build a human-readable Redis connection label from environment variables.
+ * The dsh-redis-plugin reads the same REDIS_* vars (via cordis config
+ * substitution), so this reflects the actual connection target without
+ * needing to reach into the plugin's internal config.
+ * - If REDIS_URL is set, the URL is returned as-is (credentials are NOT
+ *   stripped here — the deployer controls what REDIS_URL contains).
+ * - Otherwise host:port/db is assembled with the same defaults the plugin
+ *   uses (127.0.0.1:6379/0).
+ * - keyPrefix (REDIS_KEY_PREFIX) is appended so namespace mismatches are
+ *   immediately visible in scan logs.
+ */
+function resolveRedisTarget(): string {
+  const url = process.env.REDIS_URL
+  if (url) return url
+  const host = process.env.REDIS_HOST || '127.0.0.1'
+  const port = process.env.REDIS_PORT || '6379'
+  const db = process.env.REDIS_DB || '0'
+  const keyPrefix = process.env.REDIS_KEY_PREFIX || ''
+  return `${host}:${port}/${db}${keyPrefix ? ` keyPrefix=${keyPrefix}` : ''}`
+}
 
 export class Scheduler {
   private timer: ReturnType<typeof setInterval> | undefined
   private ticking = false
+  /** Redis connection label resolved once from env vars (same source dsh-redis-plugin reads). */
+  private readonly redisTarget: string
 
   constructor(
     private readonly ctx: Context,
     private readonly cfg: QueueConfig,
     private readonly monitor: EnvironmentMonitor,
     private readonly consumer: TaskConsumer,
-  ) {}
+    private readonly queue: QueueStore,
+  ) {
+    this.redisTarget = resolveRedisTarget()
+  }
 
   /**
    * Start the poll timer. Registered via `ctx.effect`; the returned disposer
@@ -50,19 +79,46 @@ export class Scheduler {
     if (this.ticking) return
     this.ticking = true
     try {
+      // Scan and print queue information before consuming.
+      // Uses debugLog (stdout) so output is visible only when LOG_LEVEL=debug.
+      // The desktop host spawns the host process and pipes only child stdout
+      // to the terminal (stderr is buffered and dropped), while the CLI path
+      // shows stdout directly. ctx.logger writes to a Cordis ring buffer that
+      // neither path exports, so it is kept only for structured use.
+      try {
+        const queueLen = await this.queue.len()
+        const processingLen = await this.queue.processingLen()
+        const dlqLen = await this.queue.dlqLen()
+        const scanMsg = `scan: redis=${this.redisTarget} queue=${this.cfg.queueKey} len=${queueLen} processing=${processingLen} dlq=${dlqLen}`
+        debugLog(`[redis-queue] ${scanMsg}`)
+        this.ctx.logger.info('[redis-queue] %s', scanMsg)
+      } catch (scanErr: unknown) {
+        const errMsg = `queue scan error: ${errorChain(scanErr)}`
+        debugLog(`[redis-queue] ${errMsg}`)
+        this.ctx.logger.warn('[redis-queue] %s', errMsg)
+      }
+
       const env = this.monitor.sample()
       if (!env.allowed) {
-        this.ctx.logger.debug('[redis-queue] skip tick: %s', env.reason)
+        const skipMsg = `skip tick: ${env.reason}`
+        debugLog(`[redis-queue] ${skipMsg}`)
+        this.ctx.logger.debug('[redis-queue] %s', skipMsg)
         return
       }
       for (let i = 0; i < this.cfg.batchSize; i++) {
         const consumed = await this.consumer.consumeOne()
-        if (!consumed) break // queue empty
+        if (!consumed) {
+          debugLog('[redis-queue] queue empty, stop batch')
+          break // queue empty
+        }
+        debugLog(`[redis-queue] consumed task ${i + 1}/${this.cfg.batchSize}`)
         // Re-gate after each task so one batch cannot push resources over.
         if (!this.monitor.sample().allowed) break
       }
     } catch (error: unknown) {
-      this.ctx.logger.warn('[redis-queue] tick error: %s', errorChain(error))
+      const errMsg = `tick error: ${errorChain(error)}`
+      debugLog(`[redis-queue] ${errMsg}`)
+      this.ctx.logger.warn('[redis-queue] %s', errMsg)
     } finally {
       this.ticking = false
     }

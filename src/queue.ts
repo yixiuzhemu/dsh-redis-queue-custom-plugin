@@ -44,6 +44,16 @@ export class QueueStore {
     return this.ctx.redis.lLen(this.cfg.queueKey)
   }
 
+  /** Number of tasks currently in the processing-backup list (crash recovery). */
+  async processingLen(): Promise<number> {
+    return this.ctx.redis.lLen(this.cfg.processingKey)
+  }
+
+  /** Number of tasks in the dead-letter list. */
+  async dlqLen(): Promise<number> {
+    return this.ctx.redis.lLen(this.cfg.deadLetterKey)
+  }
+
   /** Push a popped task onto the processing-backup list (crash recovery). */
   async backup(task: TaskPayload): Promise<void> {
     await this.ctx.redis.rPush(this.cfg.processingKey, task)

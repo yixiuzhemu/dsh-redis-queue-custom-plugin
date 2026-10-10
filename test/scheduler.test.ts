@@ -3,6 +3,7 @@ import { Scheduler } from '../src/scheduler.ts'
 import { resolveConfig, type QueueConfig } from '../src/config.ts'
 import type { EnvironmentMonitor } from '../src/monitor.ts'
 import type { TaskConsumer } from '../src/consumer.ts'
+import type { QueueStore } from '../src/queue.ts'
 import type { EnvSample } from '../src/types.ts'
 import { createTestHost } from './stubs/host.ts'
 
@@ -29,7 +30,8 @@ function scriptedMonitor(samples: EnvSample[]): { monitor: EnvironmentMonitor; c
 function build(monitor: EnvironmentMonitor, consumer: TaskConsumer, cfgPatch: Partial<QueueConfig> = {}) {
   const host = createTestHost()
   const cfg = resolveConfig({ pollIntervalMs: 1000, ...cfgPatch })
-  const scheduler = new Scheduler(host.ctx, cfg, monitor, consumer)
+  const queue = { len: vi.fn(async () => 0), processingLen: vi.fn(async () => 0), dlqLen: vi.fn(async () => 0) } as unknown as QueueStore
+  const scheduler = new Scheduler(host.ctx, cfg, monitor, consumer, queue)
   return { host, cfg, scheduler }
 }
 

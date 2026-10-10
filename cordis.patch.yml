@@ -14,8 +14,9 @@
         consumeMode: 'poll'          # poll(非阻塞 lPop) | blocking(brPop 短超时)
         fifo: true                   # 生产者 rPush + 消费者 lPop = FIFO
         batchSize: 1
-        defaultProvider: 'deepseek'
-        defaultModel: 'deepseek-chat'
+        # 与 harness 的 agent-default-model 保持一致（deepseek adapter 在 web-app 中被禁用）。
+        defaultProvider: 'aliai'
+        defaultModel: 'qwen3.8-flash'
         requeueOnFailure: true
         maxRetries: 3
         thresholds:

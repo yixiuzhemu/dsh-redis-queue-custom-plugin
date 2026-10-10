@@ -30,6 +30,19 @@ export interface TaskPayload {
   /** User code that created the task; prompt context / audit. */
   userCode: string
   /**
+   * Optional provider route requested by the producer. When present together
+   * with `model`, the launcher validates that exact provider/model pair.
+   * When absent, the launcher searches all registered providers.
+   */
+  provider?: string
+  /**
+   * Optional model id requested by the producer. When present, the launcher
+   * resolves this exact model (using `provider` when specified, otherwise
+   * searching across providers). When absent, the launcher auto-discovers
+   * the first available model from the registered provider routes.
+   */
+  model?: string
+  /**
    * Internal retry counter, transparently carried through a requeue. Not part of
    * the producer contract; stripped from logs and never required on input.
    */

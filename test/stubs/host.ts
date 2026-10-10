@@ -42,6 +42,16 @@ export interface TestHostOptions {
   /** Override `ctx.llm.resolveCallConfig`; rejects to force a launch failure. */
   readonly resolveCallConfig?: (draft: unknown) => Promise<unknown>
   /**
+   * Provider routes returned by `ctx.llm.listProviders()`.
+   * Each entry needs at least `{ id: string }`.
+   */
+  readonly llmProviders?: Array<{ id: string; name?: string }>
+  /**
+   * Models returned by `ctx.llm.listModels(provider)` keyed by provider id.
+   * Each entry needs at least `{ id: string }`.
+   */
+  readonly llmModels?: Record<string, Array<{ id: string; name?: string }>>
+  /**
    * When true, `ctx.get(key)` throws for unregistered services, mirroring real
    * Cordis behavior. Defaults to true so the plugin's optional-injection paths
    * are exercised honestly; tests that rely on the permissive stub can opt out.
@@ -163,8 +173,14 @@ export function createTestHost(opts: TestHostOptions = {}): TestHost {
   }
 
   // ── llm / skills ──────────────────────────────────────────────────────
+  const llmProviders = opts.llmProviders ?? []
+  const llmModels = opts.llmModels ?? {}
   const llm = {
     resolveCallConfig: opts.resolveCallConfig ?? (async (d: unknown) => d),
+    listProviders: () => llmProviders.map(p => ({ id: p.id, name: p.name ?? p.id })),
+    async listModels(providerId: string) {
+      return (llmModels[providerId] ?? []).map(m => ({ id: m.id, name: m.name ?? m.id, provider: providerId }))
+    },
   }
   const knownSkills = opts.knownSkills ?? {}
   const skills = {

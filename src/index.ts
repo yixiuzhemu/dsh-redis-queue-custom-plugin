@@ -56,6 +56,7 @@ export function apply(ctx: Context, config: QueueConfig): void {
   assertConfig(cfg)
 
   if (!cfg.enabled) {
+    console.log('[redis-queue] disabled by config')
     ctx.logger.info('[redis-queue] disabled by config')
     return
   }
@@ -68,18 +69,14 @@ export function apply(ctx: Context, config: QueueConfig): void {
   const tracker = new ActiveSessionTracker(ctx, cfg, idem, queue)
   const monitor = new EnvironmentMonitor(ctx, cfg, tracker)
   const consumer = new TaskConsumer(ctx, cfg, { queue, idem, workspaces, skills, launcher, tracker })
-  const scheduler = new Scheduler(ctx, cfg, monitor, consumer)
+  const scheduler = new Scheduler(ctx, cfg, monitor, consumer, queue)
 
   // Registrations are effects: subscriptions and timers auto-dispose on unload.
   ctx.effect(() => tracker.start(), 'redis-queue.tracker')
   ctx.effect(() => monitor.start(), 'redis-queue.monitor')
   ctx.effect(() => scheduler.start(), 'redis-queue.scheduler')
 
-  ctx.logger.info(
-    '[redis-queue] ready (queue=%s, poll=%dms, mode=%s, maxSessions=%d)',
-    cfg.queueKey,
-    cfg.pollIntervalMs,
-    cfg.consumeMode,
-    cfg.thresholds.maxConcurrentSessions,
-  )
+  const readyMsg = `ready (queue=${cfg.queueKey}, poll=${cfg.pollIntervalMs}ms, mode=${cfg.consumeMode}, maxSessions=${cfg.thresholds.maxConcurrentSessions})`
+  console.log(`[redis-queue] ${readyMsg}`)
+  ctx.logger.info('[redis-queue] %s', readyMsg)
 }

@@ -1,7 +1,7 @@
 {
   "name": "@dtranx/dsh-redis-queue-custom-plugin",
   "description": "DeepSeek Harness (dsh) Redis queue consumer plugin: environment-gated polling of the DSH:TASK queue with idempotency, distributed-lock workspace provisioning, Skills-Manager resolution, and session launch.",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "license": "MIT",
   "type": "module",
   "keywords": [

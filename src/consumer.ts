@@ -17,6 +17,7 @@ import type { WorkspaceProvisioner } from './workspace.ts'
 import type { SessionLauncher } from './launcher.ts'
 import type { ActiveSessionTracker } from './tracker.ts'
 import type { TaskPayload, ValidateResult } from './types.ts'
+import { debugLog } from './debug.ts'
 
 /** Collaborators injected into the consumer (all independently testable). */
 export interface ConsumerDeps {
@@ -52,24 +53,32 @@ export class TaskConsumer {
 
     const result = validateTask(raw)
     if (!result.ok) {
+      debugLog(`[redis-queue] validation failed, sending to DLQ: ${result.reason}`)
       await this.deps.queue.toDlq(asTask(raw), result.reason)
       await this.deps.queue.ackBackup(raw)
       return true
     }
     const task = result.task
+    debugLog(`[redis-queue] processing requestId=${task.requestId} projectId=${task.projectId}`)
 
     try {
       // Idempotency: a duplicate requestId means it is already running or done.
       const claim = await this.deps.idem.claim(task.requestId)
       if (claim.state === 'duplicate') {
-        this.ctx.logger.info('[redis-queue] duplicate requestId=%s (%s), skip', task.requestId, claim.status)
+        const dupMsg = `duplicate requestId=${task.requestId} (${claim.status}), skip`
+        debugLog(`[redis-queue] ${dupMsg}`)
+        this.ctx.logger.info('[redis-queue] %s', dupMsg)
         await this.deps.queue.ackBackup(raw)
         return true
       }
+      debugLog(`[redis-queue] claimed requestId=${task.requestId}`)
 
-      const workspace = await this.deps.workspaces.ensure(task.projectId, task.taskName)
+      const workspace = await this.deps.workspaces.ensure(task.projectId)
+      debugLog(`[redis-queue] workspace ready: ${workspace.id}`)
       const skillIds = await this.deps.skills.resolve(task.skillIds)
+      debugLog(`[redis-queue] resolved ${skillIds.length} skill(s)`)
       const sessionId = await this.deps.launcher.launch({ task, workspace, skillIds })
+      debugLog(`[redis-queue] launched session=${sessionId}`)
       this.deps.tracker.track(sessionId, { requestId: task.requestId, backup: raw, task })
       return true
     } catch (error: unknown) {
@@ -97,14 +106,13 @@ export class TaskConsumer {
 
     if (this.cfg.requeueOnFailure && retries < this.cfg.maxRetries) {
       await this.deps.queue.requeue(task, retries + 1)
-      this.ctx.logger.warn(
-        '[redis-queue] handling failed, requeued requestId=%s retry=%d: %s',
-        task.requestId,
-        retries + 1,
-        reason,
-      )
+      const requeueMsg = `handling failed, requeued requestId=${task.requestId} retry=${retries + 1}: ${reason}`
+      debugLog(`[redis-queue] ${requeueMsg}`)
+      this.ctx.logger.warn('[redis-queue] %s', requeueMsg)
       return
     }
+    const dlqMsg = `handling failed after ${retries} retries, sending to DLQ requestId=${task.requestId}: ${reason}`
+    debugLog(`[redis-queue] ${dlqMsg}`)
     await this.deps.queue.toDlq(task, `handling failed after ${retries} retries: ${reason}`)
   }
 }
@@ -114,14 +122,32 @@ export class TaskConsumer {
  * `requestId` are mandatory; the remaining fields fall back to safe defaults so
  * a slightly-underfilled producer payload still processes (with the defaults
  * visible in the prompt).
+ *
+ * Tolerates double-encoded payloads: when a producer pushes a JSON string
+ * (instead of an object) and the codec's `JSON.parse` returns a string, we
+ * attempt one more `JSON.parse` to unwrap it. This handles the common case
+ * where a non-dsh producer or a redis-cli push stores a stringified JSON
+ * object that the dsh-redis-plugin codec then deserializes as a string.
+ *
  * @param raw - the decoded queue element.
  * @returns the normalized task, or a reason when it is a poison message.
  */
 export function validateTask(raw: unknown): ValidateResult {
-  if (typeof raw !== 'object' || raw === null) {
-    return { ok: false, reason: 'payload is not an object' }
+  // Tolerate double-encoded payloads: if the codec returned a string, try
+  // parsing it once more to unwrap the inner JSON object.
+  let payload = raw
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload)
+    } catch {
+      return { ok: false, reason: `payload is a string but not valid JSON: ${(payload as string).slice(0, 120)}` }
+    }
   }
-  const obj = raw as Record<string, unknown>
+
+  if (typeof payload !== 'object' || payload === null) {
+    return { ok: false, reason: `payload is not an object (got ${typeof payload})` }
+  }
+  const obj = payload as Record<string, unknown>
 
   const projectId = str(obj.projectId)
   if (projectId === undefined || projectId.trim() === '') {
@@ -146,6 +172,8 @@ export function validateTask(raw: unknown): ValidateResult {
     taskName: str(obj.taskName) ?? projectId,
     userCode: str(obj.userCode) ?? '',
     ...(str(obj.agentId) !== undefined ? { agentId: str(obj.agentId) } : {}),
+    ...(str(obj.provider) !== undefined ? { provider: str(obj.provider) } : {}),
+    ...(str(obj.model) !== undefined ? { model: str(obj.model) } : {}),
     ...(typeof obj.__retries === 'number' ? { __retries: obj.__retries } : {}),
   }
   return { ok: true, task }
