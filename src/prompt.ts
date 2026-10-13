@@ -19,24 +19,31 @@ const PLACEHOLDERS = [
 ] as const
 
 /**
- * Build the opening prompt for a task. When `template` is supplied it is used
- * verbatim with `{field}` placeholders substituted from the task; otherwise a
- * sensible translation-task default is emitted.
+ * Build the opening prompt for a task. Priority: `task.prompt` (user-supplied)
+ * > `template` (deployment override) > default translation prompt. When
+ * `mcpHint` is non-empty it is appended as a final paragraph instructing the
+ * agent to prefer MCP tools.
  *
  * @param task - the dequeued task payload.
  * @param template - optional deployment-provided template override.
+ * @param mcpHint - optional MCP tool-usage hint appended to the prompt.
  * @returns the prompt text delivered as the session's first user message.
  */
-export function buildPrompt(task: TaskPayload, template?: string): string {
-  if (template !== undefined && template.trim() !== '') {
-    return renderTemplate(template, task)
+export function buildPrompt(task: TaskPayload, template?: string, mcpHint?: string): string {
+  const base = task.prompt !== undefined && task.prompt.trim() !== ''
+    ? task.prompt
+    : template !== undefined && template.trim() !== ''
+      ? renderTemplate(template, task)
+      : [
+          `任务名称：${task.taskName}`,
+          `平台：${task.platform} 项目：${task.projectId} 发起用户：${task.userCode}`,
+          `请将以下内容从【${task.sourceLang}】翻译为【${task.targetLang}】。`,
+          `会话/请求 ID：${task.requestId}`,
+        ].join('\n')
+  if (mcpHint !== undefined && mcpHint.trim() !== '') {
+    return `${base}\n\n${mcpHint.trim()}`
   }
-  return [
-    `任务名称：${task.taskName}`,
-    `平台：${task.platform}　项目：${task.projectId}　发起用户：${task.userCode}`,
-    `请将以下内容从【${task.sourceLang}】翻译为【${task.targetLang}】。`,
-    `会话/请求 ID：${task.requestId}`,
-  ].join('\n')
+  return base
 }
 
 /** Substitute `{field}` placeholders in a template from the task payload. */

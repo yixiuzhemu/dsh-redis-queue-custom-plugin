@@ -44,6 +44,18 @@ describe('validateTask', () => {
     if (res.ok) expect(res.task.taskName).toBe(res.task.projectId) // falls back to projectId
   })
 
+  it('extracts the optional prompt field from the payload', () => {
+    const res = validateTask(sampleTask({ prompt: '自定义提示词内容' }))
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.task.prompt).toBe('自定义提示词内容')
+  })
+
+  it('omits prompt when not present in the payload', () => {
+    const res = validateTask(sampleTask())
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.task.prompt).toBeUndefined()
+  })
+
   it.each([
     ['not an object', 'nope'],
     ['missing projectId', sampleTask({ projectId: undefined })],

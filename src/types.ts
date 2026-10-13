@@ -43,6 +43,12 @@ export interface TaskPayload {
    */
   model?: string
   /**
+   * Optional user-supplied prompt. When present, it replaces the generated
+   * prompt entirely (no default template or field substitution). The
+   * deployment-level `mcpHint` is still appended.
+   */
+  prompt?: string
+  /**
    * Internal retry counter, transparently carried through a requeue. Not part of
    * the producer contract; stripped from logs and never required on input.
    */

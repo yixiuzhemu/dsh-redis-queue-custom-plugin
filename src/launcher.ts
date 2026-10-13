@@ -46,7 +46,7 @@ export class SessionLauncher {
       this.cfg.defaultModel,
     )
     debugLog(`[redis-queue] resolved model: ${resolved.provider}/${resolved.model}`)
-    const prompt = buildPrompt(task, this.cfg.promptTemplate)
+    const prompt = buildPrompt(task, this.cfg.promptTemplate, this.cfg.mcpHint)
 
     const handle: AgentHandle = await this.ctx.agents.create({
       sessionId,

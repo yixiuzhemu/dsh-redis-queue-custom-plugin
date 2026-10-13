@@ -174,6 +174,7 @@ export function validateTask(raw: unknown): ValidateResult {
     ...(str(obj.agentId) !== undefined ? { agentId: str(obj.agentId) } : {}),
     ...(str(obj.provider) !== undefined ? { provider: str(obj.provider) } : {}),
     ...(str(obj.model) !== undefined ? { model: str(obj.model) } : {}),
+    ...(str(obj.prompt) !== undefined ? { prompt: str(obj.prompt) } : {}),
     ...(typeof obj.__retries === 'number' ? { __retries: obj.__retries } : {}),
   }
   return { ok: true, task }

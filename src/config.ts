@@ -76,6 +76,8 @@ export interface QueueConfig {
   defaultModel: string
   /** Optional prompt template override (supports {field} placeholders). */
   promptTemplate: string
+  /** Optional MCP hint appended to every prompt; empty disables. */
+  mcpHint: string
 
   /** Re-queue a recoverable failure instead of dropping it. */
   requeueOnFailure: boolean
@@ -114,6 +116,7 @@ export const defaultConfig: QueueConfig = {
   defaultProvider: 'aliai',
   defaultModel: 'qwen3.8-flash',
   promptTemplate: '',
+  mcpHint: '',
   requeueOnFailure: true,
   maxRetries: 3,
   sessionMaxLifetimeMs: 1_800_000,
@@ -217,6 +220,7 @@ export const Config = z.object({
   defaultProvider: z.string().default(defaultConfig.defaultProvider),
   defaultModel: z.string().default(defaultConfig.defaultModel),
   promptTemplate: z.string().default(defaultConfig.promptTemplate),
+  mcpHint: z.string().default(defaultConfig.mcpHint),
 
   requeueOnFailure: z.boolean().default(defaultConfig.requeueOnFailure),
   maxRetries: z.number().step(1).min(0).default(defaultConfig.maxRetries),

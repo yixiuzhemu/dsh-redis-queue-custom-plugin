@@ -8,6 +8,7 @@ describe('resolveConfig', () => {
     expect(cfg.pollIntervalMs).toBe(15_000)
     expect(cfg.thresholds.maxConcurrentSessions).toBe(defaultConfig.thresholds.maxConcurrentSessions)
     expect(cfg.idempotency.keyPrefix).toBe('DSH:TASK:req')
+    expect(cfg.mcpHint).toBe('')
   })
 
   it('deep-merges nested sections without dropping sibling defaults', () => {

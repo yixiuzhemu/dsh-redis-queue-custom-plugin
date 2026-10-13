@@ -37,4 +37,43 @@ describe('buildPrompt', () => {
   it('falls back to the default when the template is blank', () => {
     expect(buildPrompt(task, '   ')).toBe(buildPrompt(task))
   })
+
+  it('appends the mcpHint when provided', () => {
+    const hint = '请优先使用可用的 MCP 工具来完成此任务。'
+    const prompt = buildPrompt(task, undefined, hint)
+    expect(prompt.endsWith(hint)).toBe(true)
+    expect(prompt).toContain('项目D25081438501的翻译任务')
+  })
+
+  it('appends the mcpHint after a custom template', () => {
+    const hint = 'Use MCP tools.'
+    const prompt = buildPrompt(task, '{taskName}', hint)
+    expect(prompt).toBe('项目D25081438501的翻译任务\n\nUse MCP tools.')
+  })
+
+  it('ignores an empty or whitespace-only mcpHint', () => {
+    expect(buildPrompt(task, undefined, '')).toBe(buildPrompt(task))
+    expect(buildPrompt(task, undefined, '   ')).toBe(buildPrompt(task))
+    expect(buildPrompt(task, undefined, undefined)).toBe(buildPrompt(task))
+  })
+
+  it('uses task.prompt as the highest priority when provided', () => {
+    const taskWithPrompt = { ...task, prompt: '用户自定义的提示词内容' }
+    expect(buildPrompt(taskWithPrompt)).toBe('用户自定义的提示词内容')
+  })
+
+  it('task.prompt overrides template', () => {
+    const taskWithPrompt = { ...task, prompt: '用户提示词' }
+    expect(buildPrompt(taskWithPrompt, '{taskName}')).toBe('用户提示词')
+  })
+
+  it('task.prompt still gets mcpHint appended', () => {
+    const taskWithPrompt = { ...task, prompt: '用户提示词' }
+    expect(buildPrompt(taskWithPrompt, undefined, 'Use MCP tools.')).toBe('用户提示词\n\nUse MCP tools.')
+  })
+
+  it('ignores empty task.prompt and falls back to default', () => {
+    expect(buildPrompt({ ...task, prompt: '' })).toBe(buildPrompt(task))
+    expect(buildPrompt({ ...task, prompt: '   ' })).toBe(buildPrompt(task))
+  })
 })
